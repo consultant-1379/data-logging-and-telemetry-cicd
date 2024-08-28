@@ -1,0 +1,85 @@
+global:
+  scrape_interval: 5s
+  external_labels:
+    monitor: 'local-monitor'
+
+rule_files:
+  - "rules.yml"
+
+scrape_configs:
+  - job_name: 'Prometheus'
+    metrics_path: /metrics
+    static_configs:
+    - targets: ['localhost:9090']
+
+  - job_name: 'RPT Production Express'
+    scrape_interval: 30s
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ['rpt.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Production MongoDB'
+    scrape_interval: 30s
+    metrics_path: /mongo-exporter/metrics
+    static_configs:
+      - targets: ['rpt.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Production Nginx'
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['rpt.ews.gic.ericsson.se:9113']
+
+  - job_name: 'RPT Production cAdvisor'
+    scrape_interval: 30s
+    metrics_path: /cadvisor/metrics
+    static_configs:
+      - targets: ['rpt.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Production Node Exporter'
+    scrape_interval: 30s
+    metrics_path: /node-exporter/metrics
+    static_configs:
+      - targets: ['rpt.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Staging Express'
+    scrape_interval: 30s
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ['rpt-staging.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Staging MongoDB'
+    scrape_interval: 30s
+    metrics_path: /mongo-exporter/metrics
+    static_configs:
+      - targets: ['rpt-staging.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Staging Nginx'
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['rpt-staging.ews.gic.ericsson.se:9113']
+
+  - job_name: 'RPT Staging cAdvisor'
+    scrape_interval: 30s
+    metrics_path: /cadvisor/metrics
+    static_configs:
+      - targets: ['rpt-staging.ews.gic.ericsson.se']
+
+  - job_name: 'RPT Staging Node Exporter'
+    scrape_interval: 30s
+    metrics_path: /node-exporter/metrics
+    static_configs:
+      - targets: ['rpt-staging.ews.gic.ericsson.se']
+
+  - job_name: 'METRICS PROD cAdvisor'
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['cAdvisor:8080']
+
+  - job_name: 'METRICS PROD Node Exporter'
+    scrape_interval: 30s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['nodeExporter:9100']

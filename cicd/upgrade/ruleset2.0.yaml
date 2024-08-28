@@ -1,0 +1,25 @@
+modelVersion: 2.0
+
+description: "Data logging and telemetry cicd: upgrade Pipeline"
+
+env:
+  - PRODUCTION_VM
+  - PASSWORD
+  - WORKSPACE
+
+rules:
+  copy-file-to-vm:
+    - task: Copy docker-compose-production file to production vm
+      cmd: sshpass -p "${env.PASSWORD}" scp "${env.WORKSPACE}"/docker-compose-production.yml root@"${env.PRODUCTION_VM}":~
+
+  pull-latest-images:
+    - task: Pull images
+      cmd: sshpass -p "${env.PASSWORD}" ssh -q -o UserKnownHostsFile=/dev/null -o CheckHostIP=no -o StrictHostKeyChecking=no root@"${env.PRODUCTION_VM}" "time docker-compose -f docker-compose-production.yml pull"
+
+  upgrade-application:
+    - task: Upgrade application with latest images
+      cmd: sshpass -p "${env.PASSWORD}" ssh -q -o UserKnownHostsFile=/dev/null -o CheckHostIP=no -o StrictHostKeyChecking=no root@"${env.PRODUCTION_VM}" "time docker-compose -f docker-compose-production.yml up -d"
+
+  remove-docker-data:
+    - task: Remove dangling docker data
+      cmd: sshpass -p "${env.PASSWORD}" ssh -q -o UserKnownHostsFile=/dev/null -o CheckHostIP=no -o StrictHostKeyChecking=no root@"${env.PRODUCTION_VM}" "docker system prune -f -a"

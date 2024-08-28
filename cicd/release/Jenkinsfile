@@ -1,0 +1,82 @@
+#!/usr/bin/env groovy
+
+def bob = "bob/bob -r \${WORKSPACE}/cicd/release/ruleset2.0.yaml"
+
+pipeline {
+    agent {
+        node {
+            label SLAVE
+        }
+    }
+
+    stages {
+        stage('Cleaning Git Repo') {
+            steps {
+                sh 'git clean -xdff'
+                sh 'git submodule sync'
+                sh 'git submodule update --init --recursive'
+            }
+        }
+        stage('Bump Version') {
+            steps {
+                sh "${bob} bump-service-version"
+                script {
+                    env.IMAGE_VERSION = readFile('artifact.properties').trim()
+                }
+            }
+        }
+        stage('Build and Publish Kibana Service') {
+            steps {
+                sh "${bob} set-kibana-env-variables"
+                sh "${bob} build-service"
+                sh "${bob} publish-service"
+            }
+        }
+        stage('Build and Publish Elasticsearch Service') {
+            steps {
+                sh "${bob} set-elasticsearch-env-variables"
+                sh "${bob} build-service"
+                sh "${bob} publish-service"
+            }
+        }
+        stage('Build and Publish Mailer Service') {
+            steps {
+                sh "${bob} set-mailer-env-variables"
+                sh "${bob} build-service"
+                sh "${bob} publish-service"
+            }
+        }
+        stage('Build and Publish Grafana Service') {
+            steps {
+                sh "${bob} set-grafana-env-variables"
+                sh "${bob} build-service"
+                sh "${bob} publish-service"
+            }
+        }
+        stage('Build and Publish Prometheus Service') {
+            steps {
+                sh "${bob} set-prometheus-env-variables"
+                sh "${bob} build-service"
+                sh "${bob} publish-service"
+            }
+        }
+        stage('Push up changes to version file') {
+            steps {
+                sh "${bob} push-changes-to-version-file"
+            }
+        }
+        stage('Archive artifact properties file') {
+            steps {
+                archiveArtifacts artifacts: 'artifact.properties', onlyIfSuccessful: true
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh "${bob} remove-docker-data"
+            }
+        }
+    }
+}

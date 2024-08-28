@@ -1,0 +1,43 @@
+#!/usr/bin/env groovy
+
+def bob = "bob/bob -r \${WORKSPACE}/cicd/upgrade/ruleset2.0.yaml"
+
+pipeline {
+    agent {
+        node {
+            label SLAVE
+        }
+    }
+    stages {
+        stage('Cleaning Git Repo') {
+            steps {
+                sh 'git clean -xdff'
+                sh 'git submodule sync'
+                sh 'git submodule update --init --recursive'
+            }
+        }
+        stage('Copy docker-compose-production file to production vm') {
+            steps {
+                sh "${bob} copy-file-to-vm"
+            }
+        }
+        stage('Pull images') {
+            steps {
+                sh "${bob} pull-latest-images"
+            }
+        }
+        stage('Upgrade application with latest images') {
+            steps {
+                sh "${bob} upgrade-application"
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh "${bob} remove-docker-data"
+            }
+        }
+    }
+}

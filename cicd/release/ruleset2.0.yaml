@@ -1,0 +1,117 @@
+modelVersion: 2.0
+
+description: "Data logging and telemetry cicd: Build and Publish Pipeline"
+
+docker-images:
+  - bump-version: armdocker.rnd.ericsson.se/dockerhub-ericsson-remote/treeder/bump:1.2.11
+
+properties:
+  - version-file-path: ./VERSION
+  - kibana-file-path: ./services/kibana/Dockerfile-production
+  - kibana-image-name: data-logging-and-telemetry-cicd_kibana
+  - elasticsearch-file-path: ./services/elasticsearch/Dockerfile-production
+  - elasticsearch-image-name: data-logging-and-telemetry-cicd_elasticsearch
+  - mailer-file-path: ./services/mailer/Dockerfile-production
+  - mailer-image-name: data-logging-and-telemetry-cicd_mailer
+  - grafana-file-path: ./services/grafana/Dockerfile-production
+  - grafana-image-name: data-logging-and-telemetry-cicd_grafana
+  - prometheus-file-path: ./services/prometheus/Dockerfile-production
+  - prometheus-image-name: data-logging-and-telemetry-cicd_prometheus
+
+var:
+  - docker-image-id
+  - dockerfile-path
+  - image-name
+  - grafana_build_arg
+
+env:
+  - PWD
+  - WORKSPACE
+  - IMAGE_VERSION
+  - GRAFANA_VIEWER_PASSWORD
+  - GRAFANA_ADMIN_PASSWORD
+
+rules:
+  bump-service-version:
+    - task: Bump Version file
+      docker-image: bump-version
+      docker-flags:
+        - "--workdir /app"
+      docker-mounts:
+        - "${env.PWD}:/app"
+      cmd: --filename ${version-file-path} patch
+    - task: Expose Version
+      cmd: cat "${version-file-path}" > ${env.WORKSPACE}/artifact.properties
+
+  set-kibana-env-variables:
+    - task: Set path to kibana dockerfile
+      cmd: echo ${kibana-file-path} > .bob/var.dockerfile-path
+    - task: Set kibana image name
+      cmd: echo ${kibana-image-name} > .bob/var.image-name
+
+  set-elasticsearch-env-variables:
+    - task: Set path to elasticsearch dockerfile
+      cmd: echo ${elasticsearch-file-path} > .bob/var.dockerfile-path
+    - task: Set elasticsearch image name
+      cmd: echo ${elasticsearch-image-name} > .bob/var.image-name
+
+  set-mailer-env-variables:
+    - task: Set path to mailer dockerfile
+      cmd: echo ${mailer-file-path} > .bob/var.dockerfile-path
+    - task: Set mailer image name
+      cmd: echo ${mailer-image-name} > .bob/var.image-name
+
+  set-prometheus-env-variables:
+    - task: Set path to prometheus dockerfile
+      cmd: echo ${prometheus-file-path} > .bob/var.dockerfile-path
+    - task: Set prometheus image name
+      cmd: echo ${prometheus-image-name} > .bob/var.image-name
+
+  set-grafana-env-variables:
+    - task: Set path to grafana dockerfile
+      cmd: echo ${grafana-file-path} > .bob/var.dockerfile-path
+    - task: Set grafana image name
+      cmd: echo ${grafana-image-name} > .bob/var.image-name
+
+  build-service:
+    - task: Set grafana build argument where applicable
+      cmd: bash -c '
+        if [[ "${var.image-name}" == *"grafana"* ]]; then
+          echo "--build-arg GRAFANA_VIEWER_PASSWORD=${env.GRAFANA_VIEWER_PASSWORD} --build-arg GRAFANA_ADMIN_PASSWORD=${env.GRAFANA_ADMIN_PASSWORD}" > .bob/var.grafana_build_arg;
+        else
+          echo "" > .bob/var.grafana_build_arg;
+        fi'
+    - task: Docker build Specified Service
+      cmd: docker build -f ${var.dockerfile-path} ${var.grafana_build_arg} -t armdocker.rnd.ericsson.se/proj_openstack_tooling/${var.image-name}:${env.IMAGE_VERSION} --pull ${env.WORKSPACE}
+    - task: Get Docker Image ID
+      cmd: docker images armdocker.rnd.ericsson.se/proj_openstack_tooling/${var.image-name} -q > .bob/var.docker-image-id
+    - task: Docker tag Image
+      cmd: docker tag ${var.docker-image-id} armdocker.rnd.ericsson.se/proj_openstack_tooling/${var.image-name}:latest
+
+  publish-service:
+    - task: Push Docker Image with specific version
+      cmd: docker push armdocker.rnd.ericsson.se/proj_openstack_tooling/${var.image-name}:${env.IMAGE_VERSION}
+    - task: Push Docker Image with latest version
+      cmd: docker push armdocker.rnd.ericsson.se/proj_openstack_tooling/${var.image-name}:latest
+
+  push-changes-to-version-file:
+    - task: Git Add
+      cmd: git add ${version-file-path}
+    - task: Git Commit
+      cmd: git commit -m "Version ${env.IMAGE_VERSION}"
+    - task: Git Tag
+      cmd: git tag -a "${env.IMAGE_VERSION}" -m "version ${env.IMAGE_VERSION}"
+    - task: Git Rebase
+      cmd: git rebase HEAD gcn/master
+    - task: Git Push master branch
+      cmd: git push ssh://gerrit.ericsson.se:29418/OSS/com.ericsson.oss.ci/data-logging-and-telemetry-cicd HEAD:master
+    - task: Git Push tags
+      cmd: git push --tags ssh://gerrit.ericsson.se:29418/OSS/com.ericsson.oss.ci/data-logging-and-telemetry-cicd
+
+  git-clean:
+    - task: git-clean
+      cmd: docker run --rm -v ${env.PWD}:/git/ armdocker.rnd.ericsson.se/dockerhub-ericsson-remote/alpine/git clean -xdff
+
+  remove-docker-data:
+    - task: Remove dangling docker data
+      cmd: docker system prune -f -a
